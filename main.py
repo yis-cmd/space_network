@@ -11,7 +11,6 @@ class RelayPacket(Packet):
         super().__init__(packet_to_relay, sender, proxy)
     
     def __repr__(self):
-        # return f"{self.sender} {self.receiver}"
         return f"RelayPacket(Relaying [{self.data}] to {self.receiver} from {self.sender})"
 
 class Satellite(SpaceEntity):
