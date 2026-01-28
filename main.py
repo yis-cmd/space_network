@@ -89,7 +89,7 @@ def smart_send_packet(space_entities:list[SpaceEntity], message:Packet, key):
     attempt_transmission(to_send)
 
 if __name__ == "__main__":
-    network = SpaceNetwork(level=1)
+    network = SpaceNetwork(level=7)
     sat1 = Satellite("sat1", 100, 1)
     sat2 = Satellite("sat2", 200, 2)
     sat3 = Satellite("sat3", 300, 3)
