@@ -1,12 +1,16 @@
 from __future__ import annotations
 from time import sleep
+import find_route
 from space_network_lib import DataCorruptedError, LinkTerminatedError, OutOfRangeError, Packet, SpaceEntity, SpaceNetwork, TemporalInterferenceError
 
 class BrokenConnectionError(Exception):
     pass
 
+class NoSuchEntityError(Exception):
+    pass
+
 class EncryptedPacket(Packet):
-    def __init__(self, data, sender, receiver, key):
+    def __init__(self, data:str, sender:SpaceEntity, receiver:SpaceEntity, key:int):
         super().__init__(data, sender, receiver)
         self.data  = self.__encrypt(key)
 
@@ -68,37 +72,39 @@ def attempt_transmission(message:Packet):
             print("Target out of range")
             raise BrokenConnectionError
 
-def find_route(space_entities:list[SpaceEntity], message:Packet, key)-> Packet | RelayPacket:
-    assert isinstance(message.sender, SpaceEntity)
-    assert isinstance(message.receiver, SpaceEntity)
-    if message.sender.distance_from_earth + 150 >= message.receiver.distance_from_earth:
-        encrypted = EncryptedPacket(message.data, message.sender, message.receiver, key)
-        print(f"the encrypted message is {encrypted}")
-        return encrypted
-    for entity in space_entities:
-        if entity.distance_from_earth > message.sender.distance_from_earth and entity.distance_from_earth - message.sender.distance_from_earth <= 150:
-            proxy = entity
-            break
-    if proxy is None:
-        raise OutOfRangeError
-    new_message = find_route(space_entities, Packet(message.data, proxy, message.receiver), key)
-    return RelayPacket(new_message, message.sender, proxy)
+def build_message(message:EncryptedPacket, route:list[SpaceEntity])->RelayPacket | EncryptedPacket:
+    if len(route) < 2:
+        return message
+    relay = message
+    for entity in range(len(route) -1, 0, -1):
+        relay = RelayPacket(relay, route[entity -1], route[entity])
+    return relay
 
-def smart_send_packet(space_entities:list[SpaceEntity], message:Packet, key):
-    to_send = find_route(space_entities, message, key)
+def smart_send_packet(space_entities:list[SpaceEntity], message:Packet, key:int):
+    route:list[SpaceEntity] = find_route.build_route(space_entities, message.sender, message.receiver)
+    encrypted_packet = EncryptedPacket(message.data, route[-1], message.receiver, key)
+    to_send = build_message(encrypted_packet, route)
     attempt_transmission(to_send)
 
 if __name__ == "__main__":
-    network = SpaceNetwork(level=7)
+    network = SpaceNetwork(level=1)
     sat1 = Satellite("sat1", 100, 1)
     sat2 = Satellite("sat2", 200, 2)
     sat3 = Satellite("sat3", 300, 3)
     sat4 = Satellite("sat4", 400, 4)
     earth = Earth("earth", 0)
-    space_entities = [sat1, sat2, sat3, sat4, earth]
+    
+    #shiny new satellites 
+    sat5 = Satellite("sat5", 150, 5)
+    sat6 = Satellite("sat6", 250, 6)
+    sat7 = Satellite("sat7", 350, 7)
+    
+    space_entities = [sat1, sat2, sat3, sat4, sat5, sat6, sat7, earth]
     p_final = Packet("Hello from Earth!!", earth, sat4)
     try:
         key = earth.keys(p_final.receiver.name)
+        if key is None:
+            raise NoSuchEntityError
         smart_send_packet(space_entities, p_final, key)
     except BrokenConnectionError:
         print("Transmission failed")
